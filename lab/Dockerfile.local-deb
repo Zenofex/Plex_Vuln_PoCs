@@ -1,0 +1,8 @@
+FROM plexinc/pms-docker:1.43.3.10861-07dfddaeb
+
+ARG PMS_PACKAGE
+ARG PMS_VERSION
+COPY ${PMS_PACKAGE} /tmp/plexmediaserver.deb
+RUN dpkg -i /tmp/plexmediaserver.deb \
+    && sed -i "s/^version=.*/version=${PMS_VERSION}/" /version.txt \
+    && rm /tmp/plexmediaserver.deb

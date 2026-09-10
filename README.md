@@ -1,8 +1,8 @@
-# Plex Media Server 1.43.3 Vulnerability PoCs
+# Plex Media Server Patch-Diff Vulnerability PoCs
 
-This repository contains reproducible proof-of-concept code for two security
-issues fixed between Plex Media Server `1.43.3.10861-07dfddaeb` and
-`1.43.3.10896-cb3ebc72d`.
+This repository contains reproducible proof-of-concept code for security issues
+identified by comparing patched Plex Media Server builds from
+`1.43.3.10828-00f62d37d` through `1.43.4.10903-e5521bd8c`.
 
 The PoCs are organized by vulnerability and use only Python's standard library.
 Each directory contains a technical writeup, affected/fixed version evidence,
@@ -10,36 +10,44 @@ command-line usage, and expected results.
 
 ## Included findings
 
-| Directory | Impact | Primary CWE | Authentication | Fixed version |
+| Directory | Observed effect | Primary CWE | Authentication | Fixed version |
 |---|---|---:|---|---|
+| [`companion-proxy-ssrf`](companion-proxy-ssrf/) | Arbitrary HTTP callback authority and path | CWE-918 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
+| [`framework-rpc-injection`](framework-rpc-injection/) | Private plug-in RPC invocation and file tag read | CWE-863 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
+| [`network-transcoder-preference`](network-transcoder-preference/) | Modification of protected x264 preferences | CWE-862 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
+| [`legacy-pth-rce`](legacy-pth-rce/) | Impact chain using the Framework and preference issues | CWE-862 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
 | [`profile-extra-rce`](profile-extra-rce/) | Delayed command execution as the Plex service account | CWE-88 | Confirmed with a local-administrator token | `1.43.3.10896-cb3ebc72d` |
 | [`metadata-file-read`](metadata-file-read/) | Read arbitrary files accessible to the Plex service account | CWE-36 | Confirmed with a local-administrator token | `1.43.3.10896-cb3ebc72d` |
-
-No finding first observed in `1.43.3.10896` and fixed only in the later
-`1.43.4.10903` beta is included here.
+| [`agentservice-symlink-read`](agentservice-symlink-read/) | Conditional file-read sink through an escaping metadata symlink | CWE-59 | Local-administrator token; pre-existing symlink required | `1.43.4.10903-e5521bd8c` |
 
 ## Version differences
 
-| Build | Profile `VideoEncodeFlags` | Metadata `file://` reference |
-|---|---|---|
-| `1.43.3.10861-07dfddaeb` | Accepted and forwarded to the transcoder | Returned files outside the item's bundle |
-| `1.43.3.10896-cb3ebc72d` | Rejected for client profile augmentation | Rejected unsupported or escaping references |
-| `1.43.4.10903-e5521bd8c` | Rejected | Rejected |
+| Build | Significant observed behavior |
+|---|---|
+| `1.43.3.10828-00f62d37d` | Companion callback injection, private RPC injection, network-modifiable x264 preferences, and the legacy `.pth` RCE chain are reproducible |
+| `1.43.3.10861-07dfddaeb` | Earlier issues are fixed; profile `VideoEncodeFlags` RCE and metadata `file://` read remain reproducible |
+| `1.43.3.10896-cb3ebc72d` | Profile RCE and metadata `file://` read are fixed; AgentService follows an escaping bundle symlink |
+| `1.43.4.10903-e5521bd8c` | AgentService validates path segments and resolved bundle containment |
 
-Relevant strings added to the fixed PMS binary include:
+Relevant strings added across the fixed PMS binaries include:
 
 ```text
 ClientProfileExtra: ignoring transcode target setting %s, which may not be set from a profile augmentation
 [Library] Rejecting metadata file request for unsupported media reference: %s
 [Library] Rejecting metadata file request that escapes the bundle directory: %s
 [Library] Ignoring media reference that escapes its bundle directory: %s
+wanted to subscribe with an unsupported protocol '%s'
+wanted to subscribe with an out of range port %d
 ```
 
-Equivalent patch strings were confirmed in the official Linux, macOS, and
+The 10861-to-10896 patch strings were also confirmed in the official macOS and
 Windows packages. Dynamic PoC testing was performed on Linux x86-64 Docker
 images. See [TESTING.md](TESTING.md) for the test record.
 
 ## Lab setup
+
+For the complete four-version environment, including the locally packaged
+10903 build and a consistent port map, see [`lab/README.md`](lab/README.md).
 
 Use a disposable server containing no sensitive data. The following example
 publishes Plex only on the local loopback interface:
@@ -120,8 +128,10 @@ These PoCs perform real server-side file access and command execution. Run them
 only against systems you own or are explicitly authorized to test. The Docker
 instructions bind PMS to `127.0.0.1` and are intended for an isolated lab.
 
-The token scope was tested with local-administrator tokens. Managed and shared
-user tokens were not tested, and no claim is made about those token classes.
+Token scope for the authenticated findings was tested with local-administrator
+tokens. Managed and shared-user tokens were not tested, and no claim is made
+about those token classes. The unauthenticated findings were tested from the
+local Docker network against unclaimed lab servers; WAN behavior was not tested.
 
 ## References
 
