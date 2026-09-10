@@ -15,74 +15,15 @@ CVSS calculations. They reflect the demonstrated impact and tested
 preconditions. The legacy RCE entry is an impact chain composed from two listed
 primitives and is not counted as a separate root cause.
 
-### Critical
-
-#### [Delayed RCE chain](legacy-pth-rce/)
-
-- **Primitive:** Framework path placement chained with x264 preference injection
-- **Impact:** Delayed command execution as the Plex service account
-- **Access:** No token required in the tested unclaimed local-network lab
-- **Preconditions:** Fresh Framework state, media item, software transcode, and Plex Script Host startup
-- **Classification:** CWE-862, CWE-94, CWE-22
-- **Boundary:** Reproduced on 10828; blocked on 10861
-
-### High
-
-#### [CompanionProxy callback SSRF](companion-proxy-ssrf/)
-
-- **Primitive:** Callback URL authority and path injection
-- **Impact:** Server-side timeline POST to an attacker-selected HTTP destination
-- **Access:** No token required in the tested unclaimed local-network lab
-- **Precondition:** Destination must be reachable from PMS
-- **Classification:** CWE-918
-- **Boundary:** Affected 10828; fixed 10861
-
-#### [Framework private RPC injection](framework-rpc-injection/)
-
-- **Primitive:** Route-variable clobbering and private plug-in RPC invocation
-- **Impact:** LocalMedia `ReadTags` invocation against a selected server-side path
-- **Access:** No token required in the tested unclaimed local-network lab
-- **Precondition:** Target must be parseable by LocalMedia
-- **Classification:** CWE-863, CWE-20
-- **Boundary:** Affected 10828; fixed 10861
-
-#### [Protected transcoder preference modification](network-transcoder-preference/)
-
-- **Primitive:** Unauthorized persistent preference modification
-- **Impact:** Control of x264 options consumed by software transcoding
-- **Access:** No token required in the tested unclaimed local-network lab
-- **Precondition:** Software transcode required for downstream use
-- **Classification:** CWE-862
-- **Boundary:** Affected 10828; fixed 10861
-
-#### [Client-profile command execution](profile-extra-rce/)
-
-- **Primitive:** Client-profile augmentation injects transcoder arguments
-- **Impact:** Delayed command execution as the Plex service account
-- **Access:** Confirmed with a local-administrator token
-- **Preconditions:** Media item, software transcode, and Plex Script Host startup
-- **Classification:** CWE-88, CWE-94, CWE-73
-- **Boundary:** Affected 10861; fixed 10896
-
-#### [Metadata endpoint file read](metadata-file-read/)
-
-- **Primitive:** Attacker-controlled `file://` metadata reference
-- **Impact:** Arbitrary file read within Plex service-account permissions
-- **Access:** Confirmed with a local-administrator token
-- **Precondition:** Valid metadata rating key
-- **Classification:** CWE-36, CWE-73
-- **Boundary:** Affected 10861; fixed 10896
-
-### Medium
-
-#### [AgentService symlink file read](agentservice-symlink-read/)
-
-- **Primitive:** Symlink following without resolved-path containment
-- **Impact:** Conditional read of files accessible to the Plex service account
-- **Access:** Local-administrator token required
-- **Precondition:** Pre-existing escaping symlink in a crafted legacy metadata bundle; no remote placement primitive was demonstrated
-- **Classification:** CWE-59, CWE-22
-- **Boundary:** Affected 10896; fixed 10903
+| Severity | Finding | Primitive to impact | Access and boundary |
+|---|---|---|---|
+| **Critical** | [Unauthenticated Framework and x264 preference chain to command execution](legacy-pth-rce/)<br><sub>CWE-862, CWE-94, CWE-22</sub> | Framework path placement + protected-preference modification → executable `.pth` placement → command execution as the Plex account | No token in the tested local lab<br>10828 affected; 10861 blocked |
+| **High** | [CompanionProxy callback injection enabling server-side request forgery](companion-proxy-ssrf/)<br><sub>CWE-918</sub> | Callback authority and path injection → server-side timeline POST to a selected HTTP destination | No token in the tested local lab<br>10828 affected; 10861 fixed |
+| **High** | [Framework route injection enabling private LocalMedia RPC invocation](framework-rpc-injection/)<br><sub>CWE-863, CWE-20</sub> | Route-variable clobbering → private `ReadTags` call against a selected server-side media path | No token in the tested local lab<br>10828 affected; 10861 fixed |
+| **High** | [Unauthenticated modification of protected x264 transcoder preferences](network-transcoder-preference/)<br><sub>CWE-862</sub> | Missing preference authorization → persistent control of x264 options used by software transcoding | No token in the tested local lab<br>10828 affected; 10861 fixed |
+| **High** | [Client-profile augmentation enabling transcoder argument injection and command execution](profile-extra-rce/)<br><sub>CWE-88, CWE-94, CWE-73</sub> | Profile augmentation injection → transcoder-controlled `.pth` placement → command execution as the Plex account | Local-administrator token<br>10861 affected; 10896 fixed |
+| **High** | [Metadata `file://` reference injection enabling arbitrary server-side file read](metadata-file-read/)<br><sub>CWE-36, CWE-73</sub> | External path control → arbitrary file read within Plex account permissions | Local-administrator token<br>10861 affected; 10896 fixed |
+| **Medium** | [AgentService symlink resolution without bundle containment enabling conditional file read](agentservice-symlink-read/)<br><sub>CWE-59, CWE-22</sub> | Escaping bundle symlink → conditional file read within Plex account permissions | Token + pre-existing symlink<br>10896 affected; 10903 fixed |
 
 Build numbers are shorthand for the complete versions below. Authentication
 observations apply only to the tested local lab. Managed-user, shared-user, and
