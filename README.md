@@ -8,17 +8,26 @@ The PoCs are organized by vulnerability and use only Python's standard library.
 Each directory contains a technical writeup, affected/fixed version evidence,
 command-line usage, and expected results.
 
-## Included findings
+## Finding summary
 
-| Directory | Observed effect | Primary CWE | Authentication | Fixed version |
-|---|---|---:|---|---|
-| [`companion-proxy-ssrf`](companion-proxy-ssrf/) | Arbitrary HTTP callback authority and path | CWE-918 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
-| [`framework-rpc-injection`](framework-rpc-injection/) | Private plug-in RPC invocation and file tag read | CWE-863 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
-| [`network-transcoder-preference`](network-transcoder-preference/) | Modification of protected x264 preferences | CWE-862 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
-| [`legacy-pth-rce`](legacy-pth-rce/) | Impact chain using the Framework and preference issues | CWE-862 | No token required in the unclaimed local lab | `1.43.3.10861-07dfddaeb` |
-| [`profile-extra-rce`](profile-extra-rce/) | Delayed command execution as the Plex service account | CWE-88 | Confirmed with a local-administrator token | `1.43.3.10896-cb3ebc72d` |
-| [`metadata-file-read`](metadata-file-read/) | Read arbitrary files accessible to the Plex service account | CWE-36 | Confirmed with a local-administrator token | `1.43.3.10896-cb3ebc72d` |
-| [`agentservice-symlink-read`](agentservice-symlink-read/) | Conditional file-read sink through an escaping metadata symlink | CWE-59 | Local-administrator token; pre-existing symlink required | `1.43.4.10903-e5521bd8c` |
+Severity ratings are provisional researcher assessments, not vendor scores or
+CVSS calculations. They reflect the demonstrated impact and tested
+preconditions. The legacy RCE entry is an impact chain composed from two listed
+primitives and is not counted as a separate root cause.
+
+| PoC | Severity | Primitive | Demonstrated impact | Authentication and preconditions | CWE | Confirmed boundary |
+|---|---|---|---|---|---|---|
+| [`companion-proxy-ssrf`](companion-proxy-ssrf/) | High | Callback URL authority and path injection | Server-side timeline POST to an attacker-selected HTTP destination | No token required on an unclaimed local-network lab; target must be reachable from PMS | CWE-918 | Affected: 10828; fixed: 10861 |
+| [`framework-rpc-injection`](framework-rpc-injection/) | High | Route-variable clobbering and private plug-in RPC invocation | LocalMedia `ReadTags` invocation against a selected server-side media path | No token required on an unclaimed local-network lab; target must be parseable by LocalMedia | CWE-863, CWE-20 | Affected: 10828; fixed: 10861 |
+| [`network-transcoder-preference`](network-transcoder-preference/) | High | Unauthorized protected-preference modification | Persistent control of x264 options consumed by software transcoding | No token required on an unclaimed local-network lab; software transcode required for downstream use | CWE-862 | Affected: 10828; fixed: 10861 |
+| [`legacy-pth-rce`](legacy-pth-rce/) | Critical | Chain of Framework path placement and x264 preference injection | Delayed command execution as the Plex service account | No token required on the tested unclaimed local-network lab; fresh Framework state, media item, software transcode, and Script Host startup required | CWE-862, CWE-94, CWE-22 | Reproduced: 10828; blocked: 10861 |
+| [`profile-extra-rce`](profile-extra-rce/) | High | Client-profile augmentation injects transcoder arguments | Delayed command execution as the Plex service account | Confirmed with a local-administrator token; media item, software transcode, and Script Host startup required | CWE-88, CWE-94, CWE-73 | Affected: 10861; fixed: 10896 |
+| [`metadata-file-read`](metadata-file-read/) | High | Attacker-controlled `file://` metadata reference | Arbitrary file read within Plex service-account permissions | Confirmed with a local-administrator token and a valid metadata rating key | CWE-36, CWE-73 | Affected: 10861; fixed: 10896 |
+| [`agentservice-symlink-read`](agentservice-symlink-read/) | Medium | Symlink following without resolved-path containment | Conditional read of files accessible to the Plex service account | Local-administrator token and a pre-existing escaping symlink in a crafted legacy metadata bundle required; no remote placement primitive demonstrated | CWE-59, CWE-22 | Affected: 10896; fixed: 10903 |
+
+Build numbers in the boundary column are shorthand for the complete versions in
+the version table below. Authentication observations apply only to the tested
+local lab. Managed-user, shared-user, and WAN behavior were not established.
 
 ## Version differences
 
