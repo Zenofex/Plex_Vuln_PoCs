@@ -15,19 +15,78 @@ CVSS calculations. They reflect the demonstrated impact and tested
 preconditions. The legacy RCE entry is an impact chain composed from two listed
 primitives and is not counted as a separate root cause.
 
-| PoC | Severity | Primitive | Demonstrated impact | Authentication and preconditions | CWE | Confirmed boundary |
-|---|---|---|---|---|---|---|
-| [`legacy-pth-rce`](legacy-pth-rce/) | Critical | Chain of Framework path placement and x264 preference injection | Delayed command execution as the Plex service account | No token required on the tested unclaimed local-network lab; fresh Framework state, media item, software transcode, and Script Host startup required | CWE-862, CWE-94, CWE-22 | Reproduced: 10828; blocked: 10861 |
-| [`companion-proxy-ssrf`](companion-proxy-ssrf/) | High | Callback URL authority and path injection | Server-side timeline POST to an attacker-selected HTTP destination | No token required on an unclaimed local-network lab; target must be reachable from PMS | CWE-918 | Affected: 10828; fixed: 10861 |
-| [`framework-rpc-injection`](framework-rpc-injection/) | High | Route-variable clobbering and private plug-in RPC invocation | LocalMedia `ReadTags` invocation against a selected server-side media path | No token required on an unclaimed local-network lab; target must be parseable by LocalMedia | CWE-863, CWE-20 | Affected: 10828; fixed: 10861 |
-| [`network-transcoder-preference`](network-transcoder-preference/) | High | Unauthorized protected-preference modification | Persistent control of x264 options consumed by software transcoding | No token required on an unclaimed local-network lab; software transcode required for downstream use | CWE-862 | Affected: 10828; fixed: 10861 |
-| [`profile-extra-rce`](profile-extra-rce/) | High | Client-profile augmentation injects transcoder arguments | Delayed command execution as the Plex service account | Confirmed with a local-administrator token; media item, software transcode, and Script Host startup required | CWE-88, CWE-94, CWE-73 | Affected: 10861; fixed: 10896 |
-| [`metadata-file-read`](metadata-file-read/) | High | Attacker-controlled `file://` metadata reference | Arbitrary file read within Plex service-account permissions | Confirmed with a local-administrator token and a valid metadata rating key | CWE-36, CWE-73 | Affected: 10861; fixed: 10896 |
-| [`agentservice-symlink-read`](agentservice-symlink-read/) | Medium | Symlink following without resolved-path containment | Conditional read of files accessible to the Plex service account | Local-administrator token and a pre-existing escaping symlink in a crafted legacy metadata bundle required; no remote placement primitive demonstrated | CWE-59, CWE-22 | Affected: 10896; fixed: 10903 |
+### Critical
 
-Build numbers in the boundary column are shorthand for the complete versions in
-the version table below. Authentication observations apply only to the tested
-local lab. Managed-user, shared-user, and WAN behavior were not established.
+#### [Delayed RCE chain](legacy-pth-rce/)
+
+- **Primitive:** Framework path placement chained with x264 preference injection
+- **Impact:** Delayed command execution as the Plex service account
+- **Access:** No token required in the tested unclaimed local-network lab
+- **Preconditions:** Fresh Framework state, media item, software transcode, and Plex Script Host startup
+- **Classification:** CWE-862, CWE-94, CWE-22
+- **Boundary:** Reproduced on 10828; blocked on 10861
+
+### High
+
+#### [CompanionProxy callback SSRF](companion-proxy-ssrf/)
+
+- **Primitive:** Callback URL authority and path injection
+- **Impact:** Server-side timeline POST to an attacker-selected HTTP destination
+- **Access:** No token required in the tested unclaimed local-network lab
+- **Precondition:** Destination must be reachable from PMS
+- **Classification:** CWE-918
+- **Boundary:** Affected 10828; fixed 10861
+
+#### [Framework private RPC injection](framework-rpc-injection/)
+
+- **Primitive:** Route-variable clobbering and private plug-in RPC invocation
+- **Impact:** LocalMedia `ReadTags` invocation against a selected server-side path
+- **Access:** No token required in the tested unclaimed local-network lab
+- **Precondition:** Target must be parseable by LocalMedia
+- **Classification:** CWE-863, CWE-20
+- **Boundary:** Affected 10828; fixed 10861
+
+#### [Protected transcoder preference modification](network-transcoder-preference/)
+
+- **Primitive:** Unauthorized persistent preference modification
+- **Impact:** Control of x264 options consumed by software transcoding
+- **Access:** No token required in the tested unclaimed local-network lab
+- **Precondition:** Software transcode required for downstream use
+- **Classification:** CWE-862
+- **Boundary:** Affected 10828; fixed 10861
+
+#### [Client-profile command execution](profile-extra-rce/)
+
+- **Primitive:** Client-profile augmentation injects transcoder arguments
+- **Impact:** Delayed command execution as the Plex service account
+- **Access:** Confirmed with a local-administrator token
+- **Preconditions:** Media item, software transcode, and Plex Script Host startup
+- **Classification:** CWE-88, CWE-94, CWE-73
+- **Boundary:** Affected 10861; fixed 10896
+
+#### [Metadata endpoint file read](metadata-file-read/)
+
+- **Primitive:** Attacker-controlled `file://` metadata reference
+- **Impact:** Arbitrary file read within Plex service-account permissions
+- **Access:** Confirmed with a local-administrator token
+- **Precondition:** Valid metadata rating key
+- **Classification:** CWE-36, CWE-73
+- **Boundary:** Affected 10861; fixed 10896
+
+### Medium
+
+#### [AgentService symlink file read](agentservice-symlink-read/)
+
+- **Primitive:** Symlink following without resolved-path containment
+- **Impact:** Conditional read of files accessible to the Plex service account
+- **Access:** Local-administrator token required
+- **Precondition:** Pre-existing escaping symlink in a crafted legacy metadata bundle; no remote placement primitive was demonstrated
+- **Classification:** CWE-59, CWE-22
+- **Boundary:** Affected 10896; fixed 10903
+
+Build numbers are shorthand for the complete versions below. Authentication
+observations apply only to the tested local lab. Managed-user, shared-user, and
+WAN behavior were not established.
 
 ## Version differences
 
