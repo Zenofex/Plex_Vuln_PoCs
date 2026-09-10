@@ -158,3 +158,7 @@ deployment assumptions were not available at publication time.
 
 - [Plex security update announcement](https://forums.plex.tv/t/important-security-update-for-plex-media-server-v1-43-2-and-earlier/942319)
 - [Plex Media Server downloads](https://www.plex.tv/media-server-downloads/)
+
+## License
+
+This repository is released under the [MIT License](LICENSE).
