@@ -56,9 +56,17 @@ disclosure from a supported media file, not arbitrary byte-for-byte file read.
 Implementation references:
 
 - Cerealizer argument construction: [`poc.py`](poc.py#L18)
-- injected messaging target: [`poc.py`](poc.py#L45)
-- agent-service request: [`poc.py`](poc.py#L58)
-- result validation: [`poc.py`](poc.py#L68)
+- injected messaging target: [`poc.py`](poc.py#L48)
+- agent-service request: [`poc.py`](poc.py#L61)
+- result validation: [`poc.py`](poc.py#L71)
+
+## Patch evidence and requirements
+
+The packaged 10861 Framework prevents query parameters from replacing route
+variables and returns the failed agent-validation result. Python 3 and the same
+tagged fixture inside both servers are required. Fixed mode requires the exact
+documented XML error; vulnerable mode requires the marker in the selected tag
+field. Package hashes and results are in [`TESTING.md`](../TESTING.md).
 
 ## Usage
 

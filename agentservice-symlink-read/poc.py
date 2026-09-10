@@ -64,33 +64,15 @@ def main():
     posters = f"{combined}/posters"
     info = f"{combined}/Info.xml"
     symlink = f"{posters}/outside"
-    xml = b'<Movie><posters><item media="outside"/></posters></Movie>\n'
+    control_path = f"{posters}/control"
+    control_data = f"agentservice-control-{stamp}\n".encode("ascii")
+    control_xml = b'<Movie><posters><item media="control"/></posters></Movie>\n'
+    outside_xml = b'<Movie><posters><item media="outside"/></posters></Movie>\n'
 
-    remove_bundle(args.container, bundle)
-    try:
-        docker(args.container, "mkdir", "-p", posters)
-        docker(
-            args.container,
-            "tee",
-            info,
-            input_data=xml,
-            stdout=subprocess.DEVNULL,
-        )
-        docker(args.container, "ln", "-s", args.target, symlink)
-        docker(args.container, "chown", "-R", "plex:plex", bundle)
-        expected = docker(
-            args.container,
-            "cat",
-            args.target,
-            stdout=subprocess.PIPE,
-        ).stdout
-
+    def fetch_media(name):
         query = urllib.parse.urlencode(
-            {
-                "mediaType": "1",
-                "guid": guid,
-                "url": "metadata://posters/outside",
-            }
+            {"mediaType": "1", "guid": guid,
+             "url": f"metadata://posters/{name}"}
         )
         request = urllib.request.Request(
             f"{origin}/system/agents/media/get?{query}",
@@ -99,9 +81,45 @@ def main():
         opener = urllib.request.build_opener(NoRedirectHandler)
         try:
             with opener.open(request, timeout=15) as response:
-                status, body = response.status, response.read()
+                return response.status, response.read()
         except urllib.error.HTTPError as exc:
-            status, body = exc.code, exc.read()
+            return exc.code, exc.read()
+
+    remove_bundle(args.container, bundle)
+    try:
+        docker(args.container, "mkdir", "-p", posters)
+        docker(
+            args.container,
+            "tee",
+            info,
+            input_data=control_xml,
+            stdout=subprocess.DEVNULL,
+        )
+        docker(
+            args.container, "tee", control_path,
+            input_data=control_data, stdout=subprocess.DEVNULL,
+        )
+        docker(args.container, "chown", "-R", "plex:plex", bundle)
+        expected = docker(
+            args.container,
+            "cat",
+            args.target,
+            stdout=subprocess.PIPE,
+        ).stdout
+
+        control_status, control_body = fetch_media("control")
+        if control_status != 200 or control_body != control_data:
+            raise RuntimeError(
+                f"in-bundle control request failed with HTTP {control_status}"
+            )
+        print("Control: HTTP 200 with exact in-bundle bytes")
+        docker(
+            args.container, "tee", info,
+            input_data=outside_xml, stdout=subprocess.DEVNULL,
+        )
+        docker(args.container, "ln", "-s", args.target, symlink)
+        docker(args.container, "chown", "-R", "plex:plex", bundle)
+        status, body = fetch_media("outside")
 
         print(f"HTTP {status}")
         print(f"Response bytes: {len(body)}")

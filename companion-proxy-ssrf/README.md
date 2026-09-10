@@ -47,6 +47,13 @@ Implementation references:
 - subscription and timeline requests: [`poc.py`](poc.py#L105)
 - callback assertions: [`poc.py`](poc.py#L129)
 
+## Impact, patch evidence, and requirements
+
+PMS sends a timeline POST to a client-selected reachable authority and path.
+The 10861 binary adds rejection paths for unsupported protocols and invalid
+ports. Python 3 and a callback address reachable from PMS are required. Expected
+boundary results and package hashes are in [`TESTING.md`](../TESTING.md).
+
 ## Usage
 
 `--callback-host` must resolve from the Plex server to the machine running the

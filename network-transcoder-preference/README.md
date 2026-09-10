@@ -39,9 +39,17 @@ preference protection.
 
 Implementation references:
 
-- preference update: [`poc.py`](poc.py#L57)
+- preference update: [`poc.py`](poc.py#L59)
 - stored-value parsing: [`poc.py`](poc.py#L46)
-- vulnerable and fixed assertions: [`poc.py`](poc.py#L63)
+- vulnerable and fixed assertions: [`poc.py`](poc.py#L68)
+
+## Impact, patch evidence, and requirements
+
+A local-network client can change x264 configuration consumed by later software
+transcodes. The 10861 protected-setting list adds both documented preference
+names. Python 3 and an unclaimed disposable server are required; `--value` must
+differ from the stored value. Exact results are in
+[`TESTING.md`](../TESTING.md).
 
 ## Usage
 

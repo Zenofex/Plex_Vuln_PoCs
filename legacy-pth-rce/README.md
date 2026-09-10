@@ -43,10 +43,20 @@ does not claim to exercise every earlier stage.
 
 Implementation references:
 
-- per-run x264 and `.pth` payload: [`poc.py`](poc.py#L93)
-- Framework directory-creation request: [`poc.py`](poc.py#L104)
-- preference update: [`poc.py`](poc.py#L119)
-- transcode, restart, and cleanup: [`poc.py`](poc.py#L164)
+- per-run x264 and `.pth` payload: [`poc.py`](poc.py#L105)
+- Framework directory-creation request: [`poc.py`](poc.py#L120)
+- preference update: [`poc.py`](poc.py#L132)
+- transcode, restart, and cleanup: [`poc.py`](poc.py#L173)
+
+## Impact, patch evidence, and requirements
+
+The combined primitives provide delayed command execution as the Plex account.
+The constituent evidence is documented in
+[`framework-rpc-injection`](../framework-rpc-injection/) and
+[`network-transcoder-preference`](../network-transcoder-preference/). Python 3,
+Docker access, a synthetic movie rating key, and a fresh 10828 configuration are
+required. Fixed mode tests the HTTP 403 preference boundary that breaks the
+chain. Exact results are in [`TESTING.md`](../TESTING.md).
 
 ## Usage
 

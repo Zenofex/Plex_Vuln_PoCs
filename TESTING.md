@@ -76,7 +76,9 @@ python3 profile-extra-rce/poc.py \
 ```
 
 The additional boundary tests used 10828 on port 34128, 10861 on port 34161,
-and temporary 10896 and 10903 servers on ports 50366 and 50382:
+and temporary 10896 and 10903 servers on ports 50366 and 50382. The legacy chain
+used a separate fresh 10828 configuration on port 34129 because its first stage
+creates persistent Framework state:
 
 ```bash
 python3 network-transcoder-preference/poc.py \

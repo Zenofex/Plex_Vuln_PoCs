@@ -30,6 +30,8 @@ def main():
     parser.add_argument("--file", required=True, help="File path inside the Plex server")
     parser.add_argument("--expect", choices=("vulnerable", "fixed"), required=True)
     parser.add_argument("--marker", help="String expected in the vulnerable response")
+    parser.add_argument("--marker-field", default="title",
+                        help="ReadTags field expected to contain --marker")
     args = parser.parse_args()
 
     if args.expect == "vulnerable" and not args.marker:
@@ -71,10 +73,12 @@ def main():
             parsed_body = json.loads(text)
         except json.JSONDecodeError as exc:
             raise RuntimeError("response was not the expected ReadTags JSON") from exc
-        if status != 200 or args.marker not in text:
-            raise RuntimeError("marker was not returned")
         if not isinstance(parsed_body, dict):
             raise RuntimeError("ReadTags response was not a JSON object")
+        values = parsed_body.get(args.marker_field)
+        if (status != 200 or not isinstance(values, list) or
+                args.marker not in values):
+            raise RuntimeError("marker was not returned")
     else:
         try:
             root = ET.fromstring(text)

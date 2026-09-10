@@ -1,4 +1,4 @@
-FROM plexinc/pms-docker:1.43.3.10861-07dfddaeb
+FROM plexinc/pms-docker@sha256:dd9bcf6494a1f7e817710e75d2ff66beb68485b5ea1b63c7c712adc25983b9bb
 
 ARG PMS_PACKAGE
 ARG PMS_VERSION

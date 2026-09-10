@@ -54,6 +54,8 @@ def main():
         raise RuntimeError(f"preference not present in response: {args.preference}")
 
     original = read_value()
+    if args.value == original:
+        parser.error("--value must differ from the current preference value")
     query = urllib.parse.urlencode({args.preference: args.value})
     changed = False
     try:

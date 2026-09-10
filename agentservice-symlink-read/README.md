@@ -4,8 +4,8 @@
 
 The `media_get` route in Plex Media Server `1.43.3.10896-cb3ebc72d` resolves a
 legacy metadata-bundle path and reads it without verifying the final target
-after symbolic-link resolution. A valid metadata entry whose media file is an
-absolute symlink can therefore return a file outside the bundle.
+after symbolic-link resolution. A crafted legacy metadata bundle whose media
+file is an absolute symlink can therefore return a file outside the bundle.
 
 Build `1.43.4.10903-e5521bd8c` adds path-segment validation, an allowed-category
 list, XPath variable binding, and `realpath` containment checks.
@@ -45,9 +45,18 @@ directory.
 Implementation references:
 
 - unique bundle path generation: [`poc.py`](poc.py#L55)
-- fixture and symlink creation: [`poc.py`](poc.py#L69)
-- authenticated AgentService request: [`poc.py`](poc.py#L94)
-- response comparison and bundle cleanup: [`poc.py`](poc.py#L107)
+- fixture and symlink creation: [`poc.py`](poc.py#L88)
+- authenticated AgentService request: [`poc.py`](poc.py#L72)
+- response comparison and bundle cleanup: [`poc.py`](poc.py#L110)
+
+## Impact, patch evidence, and requirements
+
+Given the stated precondition, the authenticated `media/get` route can return
+files readable by the Plex account. The PoC first retrieves an ordinary
+in-bundle control file, then tests the symlink. The 10903 System bundle adds the
+validation and containment checks listed above. Python 3, Docker access, a
+disposable container, and its local-administrator token are required. Package
+hashes and exact results are in [`TESTING.md`](../TESTING.md).
 
 ## Usage
 
