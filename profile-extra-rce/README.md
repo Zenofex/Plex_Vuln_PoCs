@@ -9,8 +9,9 @@ arguments. The complete chain uses FFmpeg HLS recursive directory creation,
 libx264's two-pass statistics output, and Python 2 `.pth` startup processing to
 execute an arbitrary command as the Plex service account.
 
-Execution is delayed until Plex Script Host next starts. The PoC can restart a
-named disposable Docker container to exercise that trigger end to end.
+Execution is delayed until Plex Script Host next starts. The PoC can start a
+dormant legacy plug-in over Plex's authenticated HTTP interface, or restart a
+named disposable Docker container, to exercise that trigger end to end.
 
 ## Classification
 
@@ -20,7 +21,9 @@ named disposable Docker container to exercise that trigger end to end.
 - CVE: not assigned as of 2026-09-10
 - Primary weakness: CWE-88, Improper Neutralization of Argument Delimiters in a Command
 - Related weaknesses: CWE-94, Improper Control of Generation of Code; CWE-73, External Control of File Name or Path
-- Authentication: confirmed with a local-administrator token; managed and shared-user tokens were not tested
+- Authentication: confirmed with an owner token on a claimed server; the
+  tokenless transcode decision returned HTTP 401; managed and shared-user tokens
+  were not tested
 - Execution context: operating-system account running Plex Media Server
 
 ## Full chain
@@ -43,7 +46,7 @@ Implementation references:
 - per-run payload construction: [`poc.py`](poc.py#L109)
 - profile augmentation header: [`poc.py`](poc.py#L127)
 - transcode requests: [`poc.py`](poc.py#L160)
-- Docker trigger and verification: [`poc.py`](poc.py#L200)
+- Script Host trigger and Docker verification: [`poc.py`](poc.py#L200)
 
 After URL decoding, the generated profile augmentation has the following
 abridged structure:
@@ -82,7 +85,8 @@ Requirements:
 - a local-administrator Plex token
 - a rating key for a software-transcodable video
 - Plex's bundled Python 2 Script Host
-- local Docker control over the disposable server for automated verification
+- local Docker control over the disposable server for file verification
+- a dormant legacy Framework plug-in when testing the no-restart HTTP trigger
 
 Complete lab chain:
 
@@ -93,12 +97,16 @@ python3 poc.py \
   --token TOKEN \
   --command 'touch /config/PROFILE_RCE_MARKER' \
   --container plex-10861 \
+  --trigger-plugin com.plexapp.agents.movieposterdb \
   --verify-path /config/PROFILE_RCE_MARKER
 ```
 
-Without Docker control, omit `--container` and `--verify-path`. The PoC starts
-the transcode and reports the requested `.pth` location, but it does not claim
-that placement or execution was verified.
+The `--trigger-plugin` request starts the dormant Script Host without restarting
+PMS. A 404 response is expected when the plug-in has no handler for the request:
+process startup occurs before route resolution. Omit `--trigger-plugin` to use a
+container restart as the trigger. Without Docker control, omit `--container`,
+`--trigger-plugin`, and `--verify-path`; the PoC then reports the requested
+`.pth` location but does not claim that placement or execution was verified.
 
 Example successful output from `1.43.3.10861-07dfddaeb`:
 
@@ -106,7 +114,8 @@ Example successful output from `1.43.3.10861-07dfddaeb`:
 [1/4] Create transcode decision
 [2/4] Start transcode
 [3/4] Verified payload: /config/.local/lib/python2.7/site-packages/plex_profile_rce_<timestamp>.pth
-[4/4] Restart container and verify execution
+[4/4] Start dormant Script Host over HTTP and verify execution
+Script Host trigger response: GET ...: HTTP 404: ...
 Removed generated artifacts for run <timestamp>
 PASS: /config/PROFILE_RCE_MARKER was created by the supplied command
 ```
