@@ -23,8 +23,13 @@ third root cause.
 - Related weaknesses: CWE-94, Improper Control of Generation of Code; CWE-22, Improper Limitation of a Pathname to a Restricted Directory
 - Affected build confirmed: `1.43.3.10828-00f62d37d`
 - Fixed build confirmed: `1.43.3.10861-07dfddaeb`
-- Authentication observed: no token required in the unclaimed local lab
-- Trigger: later Plex Script Host startup; the PoC restarts a disposable container
+- Authentication observed: no token required in the unclaimed local lab;
+  tokenless requests were blocked after the same 10828 lab server was claimed
+- Claimed-server tokenless result: Framework request HTTP 403; `/:/prefs`
+  HTTP 401; full chain not reachable
+- Claimed-server authenticated result: full chain reproduced with an owner token
+- Trigger: later Plex Script Host startup; the PoC can start a dormant stock
+  plug-in over HTTP or restart a disposable container
 
 ## Full Chain
 
@@ -33,7 +38,8 @@ third root cause.
 3. Start an HLS transcode for the selected rating key.
 4. x264 writes a per-run `.pth` containing the injected Python import line.
 5. Clear the persistent transcoder preference.
-6. Restart the disposable container and verify the command's marker path.
+6. Start a dormant stock plug-in over HTTP, or restart the disposable container,
+   and verify the command's marker path.
 7. Remove the per-run `.pth` and companion x264 file.
 
 The vulnerable test refuses to run if the Python site directory already exists.
@@ -41,12 +47,16 @@ It verifies that the Framework request creates that directory before proceeding.
 The fixed-build mode is a boundary check for the protected-preference fix; it
 does not claim to exercise every earlier stage.
 
+The tokenless result is deployment-dependent. It does not establish a pre-auth
+RCE against a normally claimed server. Trusted-network configuration, reverse
+proxies, or a separate authentication bypass can change the effective boundary.
+
 Implementation references:
 
 - per-run x264 and `.pth` payload: [`poc.py`](poc.py#L105)
 - Framework directory-creation request: [`poc.py`](poc.py#L120)
 - preference update: [`poc.py`](poc.py#L132)
-- transcode, restart, and cleanup: [`poc.py`](poc.py#L173)
+- transcode, Script Host trigger, and cleanup: [`poc.py`](poc.py#L173)
 
 ## Impact, patch evidence, and requirements
 
@@ -64,6 +74,8 @@ chain. Exact results are in [`TESTING.md`](../TESTING.md).
 python3 poc.py --url http://127.0.0.1:32400 \
   --rating-key 3 --command 'touch /config/LEGACY_RCE_MARKER' \
   --container plex-10828 --verify-path /config/LEGACY_RCE_MARKER \
+  --token TOKEN \
+  --trigger-plugin com.plexapp.agents.movieposterdb \
   --expect vulnerable
 
 python3 poc.py --url http://127.0.0.1:32401 \

